@@ -10,8 +10,8 @@ public interface PersonService {
 
     List<Person> findAll();
 
-    Person save(Person person);
+    boolean save(Person person);
 
-    void deletePerson(int id);
+    boolean deletePerson(int id);
 
 }

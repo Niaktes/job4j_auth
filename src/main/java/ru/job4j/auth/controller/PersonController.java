@@ -2,7 +2,6 @@ package ru.job4j.auth.controller;
 
 import java.util.List;
 import lombok.AllArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -32,29 +31,24 @@ public class PersonController {
 
     @PostMapping("/")
     public ResponseEntity<Person> create(@RequestBody Person person) {
-        try {
-            return new ResponseEntity<>(
-                    personService.save(person),
-                    HttpStatus.CREATED);
-        } catch (DataIntegrityViolationException e) {
-            return ResponseEntity.badRequest().build();
-        }
+        boolean result = personService.save(person);
+        return new ResponseEntity<>(
+                person,
+                result ? HttpStatus.CREATED : HttpStatus.CONFLICT);
     }
 
     @PutMapping("/")
     public ResponseEntity<Void> update(@RequestBody Person person) {
-        try {
-            personService.save(person);
-        } catch (DataIntegrityViolationException e) {
-            return ResponseEntity.badRequest().build();
-        }
-        return ResponseEntity.ok().build();
+        boolean result = personService.save(person);
+        return new ResponseEntity<>(
+                result ? HttpStatus.OK : HttpStatus.NOT_FOUND);
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable int id) {
-        personService.deletePerson(id);
-        return ResponseEntity.ok().build();
+        boolean result = personService.deletePerson(id);
+        return new ResponseEntity<>(
+                result ? HttpStatus.OK : HttpStatus.NOT_FOUND);
     }
 
 }
