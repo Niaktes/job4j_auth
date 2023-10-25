@@ -1,21 +1,30 @@
 package ru.job4j.auth.controller;
 
+import java.io.IOException;
 import java.util.List;
+import java.util.Map;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import ru.job4j.auth.model.Person;
 import ru.job4j.auth.service.PersonService;
 
 @RestController
 @AllArgsConstructor
+@Slf4j
 @RequestMapping("/person")
 public class PersonController {
 
     private final PersonService personService;
     private final PasswordEncoder encoder;
+    private final ObjectMapper objectMapper;
 
     @GetMapping("/")
     public List<Person> findAll() {
@@ -26,32 +35,59 @@ public class PersonController {
     public ResponseEntity<Person> findById(@PathVariable int id) {
         var person = personService.findById(id);
         return new ResponseEntity<>(
-                person.orElse(new Person()),
-                person.isPresent() ? HttpStatus.OK : HttpStatus.NOT_FOUND
-        );
+                person.orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Nothing found for this ID.")),
+                HttpStatus.OK);
     }
 
     @PostMapping("/")
     public ResponseEntity<Person> create(@RequestBody Person person) {
+        if (person.getLogin() == null || person.getPassword() == null) {
+            throw new NullPointerException("Login and password mustn't be empty");
+        }
+        if (person.getPassword().length() < 6) {
+            throw new IllegalArgumentException("Password must be 6 symbols length at least.");
+        }
         person.setPassword(encoder.encode(person.getPassword()));
         boolean result = personService.save(person);
-        return new ResponseEntity<>(
-                person,
-                result ? HttpStatus.CREATED : HttpStatus.CONFLICT);
+        if (!result) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Person with this login already exists.");
+        }
+        return new ResponseEntity<>(person, HttpStatus.CREATED);
     }
 
     @PutMapping("/")
     public ResponseEntity<Void> update(@RequestBody Person person) {
-        boolean result = personService.save(person);
-        return new ResponseEntity<>(
-                result ? HttpStatus.OK : HttpStatus.NOT_FOUND);
+        if (person.getLogin() == null || person.getPassword() == null) {
+            throw new NullPointerException("Login or password fields are empty");
+        }
+        if (personService.findById(person.getId()).isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Person for update not found.");
+        }
+        personService.save(person);
+        return new ResponseEntity<>(HttpStatus.OK);
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable int id) {
-        boolean result = personService.deletePerson(id);
-        return new ResponseEntity<>(
-                result ? HttpStatus.OK : HttpStatus.NOT_FOUND);
+        if (!personService.deletePerson(id)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Nothing was deleted using the specified ID.");
+        }
+        return new ResponseEntity<>(HttpStatus.OK);
+    }
+
+    @ExceptionHandler (value = {IllegalArgumentException.class})
+    private void handleException(Exception e, HttpServletRequest request,
+                                HttpServletResponse response) throws IOException {
+        response.setStatus(HttpStatus.BAD_REQUEST.value());
+        response.setContentType("application/json");
+        Map<String, String> errorDetails = Map.of(
+                "message", "User creation failed.",
+                "details", e.getMessage()
+        );
+        response.getWriter().write(objectMapper.writeValueAsString(errorDetails));
+        log.error(e.getMessage());
     }
 
 }
