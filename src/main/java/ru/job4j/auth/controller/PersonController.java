@@ -27,8 +27,8 @@ public class PersonController {
     private final ObjectMapper objectMapper;
 
     @GetMapping("/")
-    public List<Person> findAll() {
-        return personService.findAll();
+    public ResponseEntity<List<Person>> findAll() {
+        return ResponseEntity.ok(personService.findAll());
     }
 
     @GetMapping("/{id}")
