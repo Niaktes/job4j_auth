@@ -3,6 +3,7 @@ package ru.job4j.auth.controller;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -61,6 +62,9 @@ public class PersonController {
         if (person.getLogin() == null || person.getPassword() == null) {
             throw new NullPointerException("Login or password fields are empty");
         }
+        if (person.getPassword().length() < 6) {
+            throw new IllegalArgumentException("Password must be 6 symbols length at least.");
+        }
         if (personService.findById(person.getId()).isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Person for update not found.");
         }
@@ -77,13 +81,26 @@ public class PersonController {
         return new ResponseEntity<>(HttpStatus.OK);
     }
 
+    @PatchMapping("/")
+    public ResponseEntity<Person> patch(@RequestBody Person person) {
+        if (person.getPassword() != null && person.getPassword().length() < 6) {
+            throw new IllegalArgumentException("Password must be 6 symbols length at least.");
+        }
+        Optional<Person> patchedPerson = personService.patch(person);
+        return new ResponseEntity<>(
+                patchedPerson.orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST, "Id field is empty or impossible invoke set method."
+                        + "Please check existence of id and all person get/set method pairs.")),
+                HttpStatus.OK);
+    }
+
     @ExceptionHandler (value = {IllegalArgumentException.class})
     private void handleException(Exception e, HttpServletRequest request,
                                 HttpServletResponse response) throws IOException {
         response.setStatus(HttpStatus.BAD_REQUEST.value());
         response.setContentType("application/json");
         Map<String, String> errorDetails = Map.of(
-                "message", "User creation failed.",
+                "message", "Mistake in parameters.",
                 "details", e.getMessage()
         );
         response.getWriter().write(objectMapper.writeValueAsString(errorDetails));
