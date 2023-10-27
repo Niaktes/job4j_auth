@@ -1,8 +1,5 @@
 package ru.job4j.auth.service;
 
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
 import lombok.AllArgsConstructor;
@@ -50,43 +47,6 @@ public class SimplePersonService implements PersonService {
             personRepository.delete(person);
         }
         return isExists;
-    }
-
-    @Override
-    public Optional<Person> patch(Person person) {
-        Optional<Person> existedOptional = findById(person.getId());
-        if (existedOptional.isEmpty()) {
-            return Optional.empty();
-        }
-        Person existed = existedOptional.get();
-        var methods = existed.getClass().getDeclaredMethods();
-        var namePerMethod = new HashMap<String, Method>();
-        for (Method method : methods) {
-            String name = method.getName();
-            if (name.startsWith("get") || name.startsWith("set")) {
-                namePerMethod.put(name, method);
-            }
-        }
-        for (String name : namePerMethod.keySet()) {
-            if (name.startsWith("get")) {
-                Method getMethod = namePerMethod.get(name);
-                Method setMethod = namePerMethod.get(name.replace("get", "set"));
-                if (setMethod == null) {
-                    return Optional.empty();
-                }
-                try {
-                    var newValue = getMethod.invoke(person);
-                    if (newValue != null) {
-                        setMethod.invoke(existed, newValue);
-                    }
-                } catch (InvocationTargetException | IllegalAccessException e) {
-                    log.error(e.getMessage(), e);
-                    return Optional.empty();
-                }
-            }
-        }
-        personRepository.save(existed);
-        return Optional.of(existed);
     }
 
 }

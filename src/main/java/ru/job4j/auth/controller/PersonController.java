@@ -3,7 +3,6 @@ package ru.job4j.auth.controller;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -14,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import ru.job4j.auth.dto.PersonDto;
 import ru.job4j.auth.model.Person;
 import ru.job4j.auth.service.PersonService;
 
@@ -82,16 +82,15 @@ public class PersonController {
     }
 
     @PatchMapping("/")
-    public ResponseEntity<Person> patch(@RequestBody Person person) {
-        if (person.getPassword() != null && person.getPassword().length() < 6) {
-            throw new IllegalArgumentException("Password must be 6 symbols length at least.");
+    public ResponseEntity<Person> patch(@RequestBody PersonDto personDto) {
+        Person patchablePerson = personService.findById(personDto.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Wrong person id."));
+        if (personDto.getLogin() == null || personDto.getLogin().isEmpty()) {
+            throw new NullPointerException("Login mustn't be empty.");
         }
-        Optional<Person> patchedPerson = personService.patch(person);
-        return new ResponseEntity<>(
-                patchedPerson.orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST, "Id field is empty or impossible invoke set method."
-                        + "Please check existence of id and all person get/set method pairs.")),
-                HttpStatus.OK);
+        patchablePerson.setLogin(personDto.getLogin());
+        personService.save(patchablePerson);
+        return new ResponseEntity<>(patchablePerson, HttpStatus.OK);
     }
 
     @ExceptionHandler (value = {IllegalArgumentException.class})
