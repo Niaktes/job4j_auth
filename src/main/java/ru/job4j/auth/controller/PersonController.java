@@ -5,21 +5,25 @@ import java.util.List;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.validation.Valid;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import ru.job4j.auth.dto.PersonDto;
 import ru.job4j.auth.model.Person;
 import ru.job4j.auth.service.PersonService;
+import ru.job4j.auth.validation.Operation;
 
 @RestController
 @AllArgsConstructor
 @Slf4j
+@Validated
 @RequestMapping("/person")
 public class PersonController {
 
@@ -42,13 +46,8 @@ public class PersonController {
     }
 
     @PostMapping("/")
-    public ResponseEntity<Person> create(@RequestBody Person person) {
-        if (person.getLogin() == null || person.getPassword() == null) {
-            throw new NullPointerException("Login and password mustn't be empty");
-        }
-        if (person.getPassword().length() < 6) {
-            throw new IllegalArgumentException("Password must be 6 symbols length at least.");
-        }
+    @Validated(Operation.OnCreate.class)
+    public ResponseEntity<Person> create(@Valid @RequestBody Person person) {
         person.setPassword(encoder.encode(person.getPassword()));
         boolean result = personService.save(person);
         if (!result) {
@@ -58,13 +57,8 @@ public class PersonController {
     }
 
     @PutMapping("/")
-    public ResponseEntity<Void> update(@RequestBody Person person) {
-        if (person.getLogin() == null || person.getPassword() == null) {
-            throw new NullPointerException("Login or password fields are empty");
-        }
-        if (person.getPassword().length() < 6) {
-            throw new IllegalArgumentException("Password must be 6 symbols length at least.");
-        }
+    @Validated(Operation.OnUpdate.class)
+    public ResponseEntity<Void> update(@Valid @RequestBody Person person) {
         if (personService.findById(person.getId()).isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Person for update not found.");
         }
@@ -82,12 +76,9 @@ public class PersonController {
     }
 
     @PatchMapping("/")
-    public ResponseEntity<Person> patch(@RequestBody PersonDto personDto) {
+    public ResponseEntity<Person> patch(@Valid @RequestBody PersonDto personDto) {
         Person patchablePerson = personService.findById(personDto.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Wrong person id."));
-        if (personDto.getLogin() == null || personDto.getLogin().isEmpty()) {
-            throw new NullPointerException("Login mustn't be empty.");
-        }
         patchablePerson.setLogin(personDto.getLogin());
         personService.save(patchablePerson);
         return new ResponseEntity<>(patchablePerson, HttpStatus.OK);
